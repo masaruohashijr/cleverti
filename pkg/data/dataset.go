@@ -1,39 +1,51 @@
 package data
 
 import (
+	"cleverti/pkg/domain"
 	"math/rand"
 	"time"
 )
 
-func NewIntDataset(possibleAnomaliesPercentage float64, steps, minVisitorsPerTimeSteps, maxVisitorsPerTimeSteps int) (result []int) {
+func NewDataset(siteId domain.Site,
+	possibleAnomaliesPercentage float64,
+	periodLength, timeStep, minVisitorsPerTimeSteps, maxVisitorsPerTimeSteps int) (ds domain.Dataset) {
+
 	s1 := rand.NewSource(time.Now().UnixNano())
 	r1 := rand.New(s1)
 	diff := maxVisitorsPerTimeSteps - minVisitorsPerTimeSteps
-	possibleAnomalies := newPossibilities(steps, possibleAnomaliesPercentage)
-	for n := 1; n < steps; n++ {
-		randomValue := minVisitorsPerTimeSteps + r1.Intn(diff)
-		result = append(result, randomValue)
+	possibleAnomalies := newPossibilities(periodLength, possibleAnomaliesPercentage)
+	var results []float64
+	for n := 1; n < periodLength; n = n + timeStep {
+		randomValue := -1
+		if possibleAnomalies.Contains(n) {
+			randomValue = r1.Intn(3 * maxVisitorsPerTimeSteps)
+		} else {
+			randomValue = minVisitorsPerTimeSteps + r1.Intn(diff)
+		}
+		results = append(results, float64(randomValue))
 	}
-	return result
+	ds = domain.Dataset{
+		SiteId:                  string(siteId),
+		TimeAgo:                 periodLength,
+		TimeStep:                timeStep,
+		OutliersDetectionMethod: "3-sigmas",
+		MetricesList:            []string{"Visits"},
+		Results:                 results,
+	}
+	return
 }
 
-func newPossibilities(steps int, possibleAnomaliesPercentage float64) (possibilities []int) {
+// steps = 30 , percentage = 5% = #6
+func newPossibilities(steps int, possibleAnomaliesPercentage float64) (possibilities *set) {
 	s2 := rand.NewSource(time.Now().UnixNano())
 	r2 := rand.New(s2)
 	size := int(float64(steps) * possibleAnomaliesPercentage / 100)
 	if size > steps {
 		size = steps
 	}
+	possibilities = NewSet()
 	for i := 0; i < size; i++ {
-		possibilities = append(possibilities, r2.Intn(steps-1))
-	}
-	return
-}
-
-func ParseFloat64(dataset []int) (newDataset []float64) {
-	for _, d := range dataset {
-		f := float64(d)
-		newDataset = append(newDataset, f)
+		possibilities.Add(r2.Intn(steps - 1))
 	}
 	return
 }
